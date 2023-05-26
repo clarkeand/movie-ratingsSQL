@@ -22,6 +22,37 @@ def all_users():
     users = crud.get_users()
     return render_template('all_users.html', users = users)
 
+@app.route("/users", methods=["POST"])
+def register_user():
+    """Create a new user."""
+    email = request.form.get('email')
+    password = request.form.get('password')
+
+    user = crud.get_user_by_email(email)
+
+    if user: 
+        flash('YOU ARE AN IDIOT. WE CAN NOT USE THAT EMAIL AGAIN, YOU IDIOT.')
+    else:  
+        new_user = crud.create_user(email, password)
+        db.session.add(new_user)
+        db.session.commit()
+        flash("Account created! Please log in.")
+
+    return redirect("/")
+
+@app.route('/login', methods=['POST'])
+def login():
+    email = request.form.get('email')
+    password = request.form.get('password')
+
+    user = crud.get_user_by_email(email)
+    if user == None or user.password != password:
+        flash('IGNORANT FOOL THAT IS WRONG')
+    else: 
+        session['user_email'] = user.email
+        flash('RIGHT ON, WELCOME!')
+    return redirect('/')
+
 @app.route('/users/<user_id>')
 def show_user(user_id):
     """View single movies."""
@@ -39,6 +70,38 @@ def show_movie(movie_id):
     """View single movies."""
     movie = crud.get_movie_by_id(movie_id)
     return render_template('movie_details.html', movie = movie)
+
+@app.route("/update_rating", methods=["POST"])
+def update_rating():
+    rating_id = request.json["rating_id"]
+    updated_score = request.json["updated_score"]
+    crud.update_rating(rating_id, updated_score)
+    db.session.commit()
+
+    return "Success"
+
+@app.route("/movies/<movie_id>/ratings", methods=["POST"])
+def create_rating(movie_id):
+    """Create a new rating for the movie."""
+
+    logged_in_email = session.get("user_email")
+    rating_score = request.form.get("rating")
+
+    if logged_in_email is None:
+        flash("You must log in to rate a movie.")
+    elif not rating_score:
+        flash("Error: you didn't select a score for your rating.")
+    else:
+        user = crud.get_user_by_email(logged_in_email)
+        movie = crud.get_movie_by_id(movie_id)
+
+        rating = crud.create_rating(user, movie, int(rating_score))
+        db.session.add(rating)
+        db.session.commit()
+
+        flash(f"You rated this movie {rating_score} out of 5.")
+
+    return redirect(f"/movies/{movie_id}")
 
 if __name__ == "__main__":
     connect_to_db(app)
